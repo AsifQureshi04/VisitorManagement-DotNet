@@ -116,7 +116,7 @@ namespace MFL_VisitorManagement.Repositories
             var parameters = new[]
             {
                new OracleParameter("p_NewPasswordHash",NewPasswordHash),
-               new OracleParameter("p_NewPasswordSalt",NewPasswordSalt),
+               new OracleParameter("p_NewPasswordSalt",NewPasswordSalt), 
                new OracleParameter("p_CurrentPasswordHash",CurrentPasswordHash),
                new OracleParameter("p_UserId",UpdatePasswordPayload.UserId),
                new OracleParameter("p_IsUpdated",OracleDbType.Int32){Direction = ParameterDirection.Output}

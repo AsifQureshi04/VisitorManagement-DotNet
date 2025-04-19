@@ -119,7 +119,7 @@ namespace MFL_VisitorManagement.Service
                 else
                 {
                     message.StatusCode = StatusCodes.Status200OK.ToString();
-                    message.Message = "Incorrect UserId/Password";
+                    message.Message = "Incorrect UserId or password";
                     message.Token = 0;
                 }
             }

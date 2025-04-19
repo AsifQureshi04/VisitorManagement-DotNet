@@ -1,4 +1,5 @@
 using MFL_VisitorManagement.Data;
+using MFL_VisitorManagement.Extensions;
 using MFL_VisitorManagement.Interface;
 using MFL_VisitorManagement.Repositories;
 using MFL_VisitorManagement.Service;
@@ -25,6 +26,9 @@ builder.Services.AddCors(options =>
                               .AllowAnyMethod()
                               .AllowAnyHeader());
 });
+
+builder.Services.AddIdentityServices(builder.Configuration);
+
 
 // Add services to the container.
 builder.Services.AddScoped<IAuthenticateService, AuthenticateService>();

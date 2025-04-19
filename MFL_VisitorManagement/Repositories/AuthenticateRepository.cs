@@ -123,7 +123,7 @@ namespace MFL_VisitorManagement.Repositories
             };
 
             await dataContext.Database.ExecuteSqlRawAsync(
-                @"BEGIN Sp_UpdatePassword(:p_NewPasswordHash,:p_NewPasswordSalt,:p_CurrentPasswordHash,:p_UserId,:p_IsUpdated);END;",
+                @"BEGIN Sp_UpdatePassword(:p_UserId,:p_NewPasswordHash,:p_NewPasswordSalt,:p_CurrentPasswordHash,:p_IsUpdated);END;",
                 parameters);
 
             return (int)(Oracle.ManagedDataAccess.Types.OracleDecimal)parameters[4].Value; 

@@ -1,12 +1,14 @@
 ﻿using MFL_VisitorManagement.Dtos;
 using MFL_VisitorManagement.Entities;
 using MFL_VisitorManagement.Interface;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ILogger = Serilog.ILogger;
 
 
 namespace MFL_VisitorManagement.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class ManageVisitorsController(ILogger _logger, IManageVisitorService manageVisitorService) : ControllerBase

@@ -7,8 +7,12 @@ namespace MFL_VisitorManagement.Extensions
     {
         public static IServiceCollection AddIdentityServices(this IServiceCollection services, IConfiguration configuration)
         {
-            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-                .AddJwtBearer(options =>
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;    
+            })
+            .AddJwtBearer(options =>
                 {
                     var tokenKey = configuration["TokenKey"] ?? throw new Exception("Token key not found");
                     options.TokenValidationParameters = new TokenValidationParameters

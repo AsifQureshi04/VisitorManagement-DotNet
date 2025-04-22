@@ -6,6 +6,7 @@ using MFL_VisitorManagement.Interface;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Oracle.ManagedDataAccess.Client;
+using System.Collections.Generic;
 using System.Data;
 using System.Net;
 using System.Threading;
@@ -48,7 +49,6 @@ namespace MFL_VisitorManagement.Repositories
 
             return res;
         }
-
         public async Task<PagedList<VisitorDetails>> GetAllVisitorsRepo(GetAllVisitorsPayload getAllVisitorsPayload)
         {
             var parameters = new[]
@@ -113,7 +113,6 @@ namespace MFL_VisitorManagement.Repositories
             
 
         }
-
         public async Task<bool> UpdateVisitorsRepo(UpdateVisitorPayload updateVisitorPayload)
         {
             var parameters = new[]
@@ -140,8 +139,6 @@ namespace MFL_VisitorManagement.Repositories
             var result = (Oracle.ManagedDataAccess.Types.OracleDecimal)parameters[2].Value;
             return result.ToInt32() == 1;
         }
-
-
         public async Task<IEnumerable<VisitorDetails>> GetVisitorByIdRepo(VisitorById visitorById)
         {
             var parameters = new[]
@@ -203,6 +200,43 @@ namespace MFL_VisitorManagement.Repositories
             await context.Database.CloseConnectionAsync();
             return result;
 
+        }
+        public async Task<bool> DeleteVisitorByIdRepo(VisitorById visitorById)
+        {
+            var parameters = new[]
+            {
+                new OracleParameter("p_VisitorId",visitorById.VisitorId),
+                new OracleParameter("p_Result", OracleDbType.Int32)
+                {
+                    Direction = ParameterDirection.Output
+                }
+            };
+
+            await context.Database.ExecuteSqlRawAsync(
+                @"BEGIN Sp_DeleteVisitor(:p_VisitorId, :p_Result);END;",
+                parameters);
+
+            var result = (Oracle.ManagedDataAccess.Types.OracleDecimal)parameters[1].Value;
+            return result.ToInt32() == 1;
+        }
+        public async Task<IEnumerable<IdProofMaster>> GetIdProofListRepo()
+        {
+            var Ids =  await context.IdProofMasters
+                .Where(d => d.IsActive == '1' && d.IsDelete == '0')
+                .ToListAsync();
+            return Ids;
+        }
+        public async Task<IEnumerable<DepartmentMaster>> GetDepartmentListRepo()
+        {
+            var departments = await context.DepartmentMasters
+                                    .Where(d => d.IsActive == '1' && d.IsDelete == '0')
+                                    .ToListAsync();
+
+            return departments!;
+        }
+        public Task<IActionResult> GetVisitorCountRepo(VisitorCountPayload visitorCountPayload)
+        {
+            throw new NotImplementedException();
         }
     }   
 }

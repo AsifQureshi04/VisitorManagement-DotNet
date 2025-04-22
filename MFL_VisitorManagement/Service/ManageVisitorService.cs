@@ -1,4 +1,5 @@
-﻿using MFL_VisitorManagement.Dtos;
+﻿using System.Linq;
+using MFL_VisitorManagement.Dtos;
 using MFL_VisitorManagement.Entities;
 using MFL_VisitorManagement.Helpers;
 using MFL_VisitorManagement.Interface;
@@ -158,6 +159,147 @@ namespace MFL_VisitorManagement.Service
                 data.StatusCode,
                 data.Token
             });
-        }   
+        }
+        public async Task<IActionResult> DeleteVisitorById(VisitorById visitorById)
+        {
+            logger.Information("ManageVisitorService/DeleteVisitorById");
+            MessageData data = new MessageData();
+            try
+            {
+                var result = await manageVisitorRepository.DeleteVisitorByIdRepo(visitorById);
+                if (result)
+                {
+                    data.Message = "Visitor deleted successfully";
+                    data.StatusCode = StatusCodes.Status200OK.ToString();
+                    data.Token = 1;
+                }
+                else
+                {
+                    data.Message = "Failed to delete visitor";
+                    data.StatusCode = StatusCodes.Status200OK.ToString();
+                    data.Token = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Fatal("Exception from ManageVisitorService/DeleteVisitorById");
+                return await utilities.GetException(ex.Message, "201");
+            }
+
+            return new JsonResult(new
+            {
+                data.Message,
+                data.StatusCode,
+                data.Token
+            });
+        }
+        public async Task<IActionResult> GetIdProofList()
+        {
+            logger.Information("ManageVisitorService/GetIdProofList");
+            MessageData data = new MessageData();
+            try
+            {
+                var result = await manageVisitorRepository.GetIdProofListRepo();
+                if (result.Any())
+                {
+                    data.Data = result;
+                    data.Message = "Id Proof document list fethced successfully";
+                    data.StatusCode = StatusCodes.Status200OK.ToString();
+                    data.Token = 1;
+                }
+                else
+                {
+                    data.Data = null!;
+                    data.Message = "Failed to fetch Id Proof document list";
+                    data.StatusCode = StatusCodes.Status200OK.ToString();
+                    data.Token = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Fatal("Exception from ManageVisitorService/GetIdProofList");
+                return await utilities.GetException(ex.Message, "201");
+            }
+
+            return new JsonResult(new
+            {
+                data.Data,
+                data.Message,
+                data.StatusCode,
+                data.Token
+            });
+        }
+        public async Task<IActionResult> GetDepartmentList()
+        {
+            logger.Information("ManageVisitorService/GetDepartmentList");
+            MessageData data = new MessageData();
+            try
+            {
+                var result = await manageVisitorRepository.GetDepartmentListRepo();
+                if (result.Any())
+                {
+                    data.Data = result;
+                    data.Message = "Department list fethced successfully";
+                    data.StatusCode = StatusCodes.Status200OK.ToString();
+                    data.Token = 1;
+                }
+                else
+                {
+                    data.Data = null!;
+                    data.Message = "Failed to fetch department list";
+                    data.StatusCode = StatusCodes.Status200OK.ToString();
+                    data.Token = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Fatal("Exception from ManageVisitorService/GetDepartmentList");
+                return await utilities.GetException(ex.Message, "201");
+            }
+
+            return new JsonResult(new
+            {
+                data.Data,
+                data.Message,
+                data.StatusCode,
+                data.Token
+            });
+        }
+        public async Task<IActionResult> GetVisitorCount(VisitorCountPayload visitorCountPayload)
+        {
+            logger.Information("ManageVisitorService/GetVisitorCount");
+            MessageData data = new MessageData();
+            try
+            {
+                var result = await manageVisitorRepository.GetVisitorCountRepo(visitorCountPayload);
+                if (result != null)
+                {
+                    data.Data = result;
+                    data.Message = "Visitor count fetched successfully";
+                    data.StatusCode = StatusCodes.Status200OK.ToString();
+                    data.Token = 1;
+                }
+                else
+                {
+                    data.Data = null!;
+                    data.Message = "No visitors available";
+                    data.StatusCode = StatusCodes.Status200OK.ToString();
+                    data.Token = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Fatal("Exception from ManageVisitorService/GetVisitorCount");
+                return await utilities.GetException(ex.Message, "201");
+            }
+
+            return new JsonResult(new
+            {
+                data.Data,
+                data.Message,
+                data.StatusCode,
+                data.Token
+            });
+        }
     }
 }

@@ -40,5 +40,33 @@ namespace MFL_VisitorManagement.Controllers
             _logger.Information("ManageVisitorsController/UpdateVisitors");
             return await manageVisitorService.GetVisitorById(visitorById!);
         }
+
+        [HttpPost("DeleteVisitorById")]
+        public async Task<IActionResult> DeleteVisitorById(VisitorById visitorById)
+        {
+            _logger.Information("ManageVisitorsController/DeleteVisitorById");
+            return await manageVisitorService.DeleteVisitorById(visitorById!);
+        }
+
+        [HttpPost("idproof-types")]
+        public async Task<IActionResult> GetIdProofList()
+        {
+            _logger.Information("ManageVisitorsController/idproof-types");
+            return await manageVisitorService.GetIdProofList();
+        }
+
+        [HttpPost("GetDepartmentList")]
+        public async Task<IActionResult> GetDepartmentList()
+        {
+            _logger.Information("ManageVisitorsController/GetDepartmentList");
+            return await manageVisitorService.GetDepartmentList();
+        }
+
+        [HttpPost("VisitorCount")]
+        public async Task<IActionResult> GetVisitorCount(VisitorCountPayload visitorCountPayload)
+        {
+            _logger.Information("ManageVisitorsController/GetDepartmentList");
+            return await manageVisitorService.GetVisitorCount(visitorCountPayload);
+        }
     }
 }

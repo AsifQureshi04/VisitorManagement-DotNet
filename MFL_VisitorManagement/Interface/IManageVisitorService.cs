@@ -10,5 +10,9 @@ namespace MFL_VisitorManagement.Interface
         Task<IActionResult> GetAllVisitors(GetAllVisitorsPayload getAllVisitorsPayload);
         Task<IActionResult> UpdateVisitors(UpdateVisitorPayload updateVisitorPayload);
         Task<IActionResult> GetVisitorById(VisitorById visitorById);
+        Task<IActionResult> DeleteVisitorById(VisitorById visitorById);
+        Task<IActionResult> GetIdProofList();
+        Task<IActionResult> GetDepartmentList();
+        Task<IActionResult> GetVisitorCount(VisitorCountPayload visitorCountPayload);
     }
 }

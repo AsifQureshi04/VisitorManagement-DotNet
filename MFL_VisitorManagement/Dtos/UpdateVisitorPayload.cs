@@ -1,8 +1,7 @@
-﻿namespace MFL_VisitorManagement.Dtos
+﻿namespace MFL_VisitorManagement.Dtos;
+
+public class UpdateVisitorPayload
 {
-    public class UpdateVisitorPayload
-    {
-        public int VisitorId { get; set; }
-        public string ExitTime { get; set; }
-    }
+    public int VisitorId { get; set; }
+    public string ExitTime { get; set; }
 }

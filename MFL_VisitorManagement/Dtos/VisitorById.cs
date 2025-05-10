@@ -1,7 +1,6 @@
-﻿namespace MFL_VisitorManagement.Dtos
+﻿namespace MFL_VisitorManagement.Dtos;
+
+public class VisitorById
 {
-    public class VisitorById
-    {
-        public int VisitorId { get; set; }
-    }
+    public int VisitorId { get; set; }
 }

@@ -1,7 +1,6 @@
-﻿namespace MFL_VisitorManagement.Dtos
+﻿namespace MFL_VisitorManagement.Dtos;
+
+public class RoleIdPayload
 {
-    public class RoleIdPayload
-    {
-        public string RoleName { get; set; }
-    }
+    public string RoleName { get; set; }
 }

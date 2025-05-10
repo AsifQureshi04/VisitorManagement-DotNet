@@ -1,15 +1,3 @@
-using MFL_VisitorManagement.Data;
-using MFL_VisitorManagement.EmailNotification;
-using MFL_VisitorManagement.Extensions;
-using MFL_VisitorManagement.Interface;
-using MFL_VisitorManagement.Repositories;
-using MFL_VisitorManagement.Service;
-using MFL_VisitorManagement.Utility;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
-using Serilog;
-using System.Reflection;
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((context, services, configuration) => configuration

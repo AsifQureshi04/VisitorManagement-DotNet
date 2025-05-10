@@ -1,9 +1,8 @@
-﻿namespace MFL_VisitorManagement.Dtos
+﻿namespace MFL_VisitorManagement.Dtos;
+
+public class UpdatePasswordPayload
 {
-    public class UpdatePasswordPayload
-    {
-        public string UserId { get; set; }
-        public string CurrentPassword { get; set; }
-        public string NewPassword { get; set; }
-    }
+    public string UserId { get; set; }
+    public string CurrentPassword { get; set; }
+    public string NewPassword { get; set; }
 }

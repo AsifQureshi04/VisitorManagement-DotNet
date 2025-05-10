@@ -1,44 +1,31 @@
-﻿using MFL_VisitorManagement.Dtos;
-using MFL_VisitorManagement.EmailNotification;
-using MFL_VisitorManagement.Entities;
-using MFL_VisitorManagement.Helpers;
-using MFL_VisitorManagement.Interface;
-using MFL_VisitorManagement.ResponseModel;
-using MFL_VisitorManagement.Utility;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using ILogger = Serilog.ILogger;
-using Mapster;
+﻿namespace MFL_VisitorManagement.Service;
 
-
-namespace MFL_VisitorManagement.Service
+public class ManageVisitorService(ILogger logger, 
+                                  IManageVisitorRepository manageVisitorRepository,
+                                  Utilities utilities,
+                                  IEmailService emailService) : IManageVisitorService
 {
-    public class ManageVisitorService(ILogger logger, 
-                                      IManageVisitorRepository manageVisitorRepository,
-                                      Utilities utilities,
-                                      IEmailService emailService) : IManageVisitorService
+    public async Task<IActionResult> AddVisitor(AddVisitorPaylaod addVisitorPaylaod)
     {
-        public async Task<IActionResult> AddVisitor(AddVisitorPaylaod addVisitorPaylaod)
+        logger.Information("ManageVisitorService/AddVisitor");
+        MessageData data = new MessageData();
+        try
         {
-            logger.Information("ManageVisitorService/AddVisitor");
-            MessageData data = new MessageData();
-            try
-            {
-                var result = await manageVisitorRepository.AddVisitorRepo(addVisitorPaylaod);
-                var qrCodeData = addVisitorPaylaod.Adapt<QrCodeData>();
-                using var qrStream = Utilities.GenerateQRCode(qrCodeData);
-                string contentId = "qrcode123";
+            var result = await manageVisitorRepository.AddVisitorRepo(addVisitorPaylaod);
+            var qrCodeData = addVisitorPaylaod.Adapt<QrCodeData>();
+            using var qrStream = Utilities.GenerateQRCode(qrCodeData);
+            string contentId = "qrcode123";
 
-                if (!result.IsNullOrEmpty())
+            if (!result.IsNullOrEmpty())
+            {
+                var EmailRequest = new EmailRequest
                 {
-                    var EmailRequest = new EmailRequest
-                    {
-                        ToEmail = addVisitorPaylaod.Email,
-                        VisitorPass = result,
-                        Subject = "Visiting Invitation from AWC Software Noida",
-                        QrStream = qrStream,
-                        ContentId = contentId,
-                        Body = $@"
+                    ToEmail = addVisitorPaylaod.Email,
+                    VisitorPass = result,
+                    Subject = "Visiting Invitation from AWC Software Noida",
+                    QrStream = qrStream,
+                    ContentId = contentId,
+                    Body = $@"
                                 <!DOCTYPE html>
                                 <html>
                                 <head>
@@ -91,339 +78,339 @@ namespace MFL_VisitorManagement.Service
                                 </body>
                                 </html>"
 
-                    };
+                };
 
-                    var response = await emailService.SendEmailWithQrCodeAsync(EmailRequest);
-                    data.Message = "Visitor added successfully";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 1;
-                }
-                else
-                {
-                    data.Message = "There is some issue while adding visitor";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 0;
-                }
+                var response = await emailService.SendEmailWithQrCodeAsync(EmailRequest);
+                data.Message = "Visitor added successfully";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
             }
-            catch (Exception ex)
+            else
             {
-                logger.Fatal("Exception from ManageVisitorService/AddVisitor");
-                return await utilities.GetException(ex.Message, "201");
+                data.Message = "There is some issue while adding visitor";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
             }
-
-            return new JsonResult(new
-            {
-                data.Message,
-                data.StatusCode,
-                data.Token
-            });
         }
-        public async Task<IActionResult> GetAllVisitors(GetAllVisitorsPayload getAllVisitorsPayload)
+        catch (Exception ex)
         {
-            logger.Information("ManageVisitorService/GetAllVisitors");
-            MessageData data = new MessageData();
-            try
-            {
-                var result = await manageVisitorRepository.GetAllVisitorsRepo(getAllVisitorsPayload);
-                if (result.Count > 0)
-                {
-                    data.Data = result;
-                    data.Data1 = new PaginationHeader(result.CurrentPage, result.PageSize, result.TotalCount, result.TotalPages)
-                                {
-                                   CurrentPage  = result.CurrentPage ,
-                                   ItemsPerPage = result.PageSize,
-                                   TotalItems  =  result.TotalCount,
-                                   TotalPages  =  result.TotalPages
-                    };
-
-                    data.Message = "Data fetched successfully";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 1;
-                }
-                else
-                {
-                    data.Message = "No data found";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Fatal("Exception from ManageVisitorService/GetAllVisitors");
-                return await utilities.GetException(ex.Message, "201");
-            }
-
-            return new JsonResult(new
-            {
-                data.Data,
-                data.Data1,
-                data.Message,
-                data.StatusCode,
-                data.Token
-            });
-        }
-        public async Task<IActionResult> UpdateVisitors(UpdateVisitorPayload updateVisitorPayload)
-        {
-            logger.Information("ManageVisitorService/UpdateVisitors");
-            MessageData data = new MessageData();
-            try
-            {
-                var result = await manageVisitorRepository.UpdateVisitorsRepo(updateVisitorPayload);
-                if (result)
-                {
-                    data.Message = "Visitor updated successfully";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 1;
-                }
-                else
-                {
-                    data.Message = "Visitor Not updated";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Fatal("Exception from ManageVisitorService/UpdateVisitors");
-                return await utilities.GetException(ex.Message, "201");
-            }
-
-            return new JsonResult(new
-            {
-                data.Message,
-                data.StatusCode,
-                data.Token
-            });
-        }
-        public async Task<IActionResult> GetVisitorById(VisitorById visitorById)
-        {
-            logger.Information("ManageVisitorService/GetVisitorById");
-            MessageData data = new MessageData();
-            try
-            {
-                var result = await manageVisitorRepository.GetVisitorByIdRepo(visitorById);
-                if (result != null)
-                {
-                    data.Data = result.FirstOrDefault()!;
-                    data.Message = "Data fetched successfully";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 1;
-                }
-                else
-                {
-                    data.Message = "No data found";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Fatal("Exception from ManageVisitorService/GetVisitorById");
-                return await utilities.GetException(ex.Message, "201");
-            }
-
-            return new JsonResult(new
-            {
-                data.Data,
-                data.Message,
-                data.StatusCode,
-                data.Token
-            });
-        }
-        public async Task<IActionResult> DeleteVisitorById(VisitorById visitorById)
-        {
-            logger.Information("ManageVisitorService/DeleteVisitorById");
-            MessageData data = new MessageData();
-            try
-            {
-                var result = await manageVisitorRepository.DeleteVisitorByIdRepo(visitorById);
-                if (result)
-                {
-                    data.Message = "Visitor deleted successfully";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 1;
-                }
-                else
-                {
-                    data.Message = "Failed to delete visitor";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Fatal("Exception from ManageVisitorService/DeleteVisitorById");
-                return await utilities.GetException(ex.Message, "201");
-            }
-
-            return new JsonResult(new
-            {
-                data.Message,
-                data.StatusCode,
-                data.Token
-            });
-        }
-        public async Task<IActionResult> GetIdProofList()
-        {
-            logger.Information("ManageVisitorService/GetIdProofList");
-            MessageData data = new MessageData();
-            try
-            {
-                var result = await manageVisitorRepository.GetIdProofListRepo();
-                if (result.Any())
-                {
-                    data.Data = result;
-                    data.Message = "Id Proof document list fethced successfully";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 1;
-                }
-                else
-                {
-                    data.Data = null!;
-                    data.Message = "Failed to fetch Id Proof document list";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Fatal("Exception from ManageVisitorService/GetIdProofList");
-                return await utilities.GetException(ex.Message, "201");
-            }
-
-            return new JsonResult(new
-            {
-                data.Data,
-                data.Message,
-                data.StatusCode,
-                data.Token
-            });
-        }
-        public async Task<IActionResult> GetDepartmentList()
-        {
-            logger.Information("ManageVisitorService/GetDepartmentList");
-            MessageData data = new MessageData();
-            try
-            {
-                var result = await manageVisitorRepository.GetDepartmentListRepo();
-                if (result.Any())
-                {
-                    data.Data = result;
-                    data.Message = "Department list fethced successfully";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 1;
-                }
-                else
-                {
-                    data.Data = null!;
-                    data.Message = "Failed to fetch department list";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Fatal("Exception from ManageVisitorService/GetDepartmentList");
-                return await utilities.GetException(ex.Message, "201");
-            }
-
-            return new JsonResult(new
-            {
-                data.Data,
-                data.Message,
-                data.StatusCode,
-                data.Token
-            });
-        }
-        public async Task<IActionResult> GetVisitorCount()
-        {
-            logger.Information("ManageVisitorService/GetVisitorCount");
-            MessageData data = new MessageData();
-            try
-            {
-                var result = await manageVisitorRepository.GetVisitorCountRepo();
-                if (result != null)
-                {
-                    data.Data = result.FirstOrDefault()!;
-                    data.Message = "Visitor count fetched successfully";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 1;
-                }
-                else
-                {
-                    data.Data = null!;
-                    data.Message = "No visitors available";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Fatal("Exception from ManageVisitorService/GetVisitorCount");
-                return await utilities.GetException(ex.Message, "201");
-            }
-
-            return new JsonResult(new
-            {
-                data.Data,
-                data.Message,
-                data.StatusCode,
-                data.Token
-            });
+            logger.Fatal("Exception from ManageVisitorService/AddVisitor");
+            return await utilities.GetException(ex.Message, "201");
         }
 
-        public async Task<IActionResult> GetMenuItems(RoleIdPayload roleIdPayload)
+        return new JsonResult(new
         {
-            logger.Information("ManageVisitorService/GetMenuItems");
-            MessageData data = new MessageData();
-            try
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
+    }
+    public async Task<IActionResult> GetAllVisitors(GetAllVisitorsPayload getAllVisitorsPayload)
+    {
+        logger.Information("ManageVisitorService/GetAllVisitors");
+        MessageData data = new MessageData();
+        try
+        {
+            var result = await manageVisitorRepository.GetAllVisitorsRepo(getAllVisitorsPayload);
+            if (result.Count > 0)
             {
-                var result = await manageVisitorRepository.GetMenuItemsRepo(roleIdPayload);
-                if (result != null)
-                {
-                    data.Data = result;
-                    data.Message = "Menu Items fetched successfully";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 1;
-                }
-                else
-                {
-                    data.Data = null!;
-                    data.Message = "Failed to fetched menu items";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Fatal("Exception from ManageVisitorService/GetMenuItems");
-                return await utilities.GetException(ex.Message, "201");
-            }
+                data.Data = result;
+                data.Data1 = new PaginationHeader(result.CurrentPage, result.PageSize, result.TotalCount, result.TotalPages)
+                            {
+                               CurrentPage  = result.CurrentPage ,
+                               ItemsPerPage = result.PageSize,
+                               TotalItems  =  result.TotalCount,
+                               TotalPages  =  result.TotalPages
+                };
 
-            return new JsonResult(new
+                data.Message = "Data fetched successfully";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
+            }
+            else
             {
-                data.Data,
-                data.Message,
-                data.StatusCode,
-                data.Token
-            });
+                data.Message = "No data found";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal("Exception from ManageVisitorService/GetAllVisitors");
+            return await utilities.GetException(ex.Message, "201");
         }
 
-        public async Task<IActionResult> UpdateVisitorRequestStatus(UpdateVisitorRequestPayload updateVisitorRequestPayload)
+        return new JsonResult(new
         {
-            logger.Information("ManageVisitorService/UpdateVisitorRequestStatus");
-            MessageData data = new MessageData();
-            try
+            data.Data,
+            data.Data1,
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
+    }
+    public async Task<IActionResult> UpdateVisitors(UpdateVisitorPayload updateVisitorPayload)
+    {
+        logger.Information("ManageVisitorService/UpdateVisitors");
+        MessageData data = new MessageData();
+        try
+        {
+            var result = await manageVisitorRepository.UpdateVisitorsRepo(updateVisitorPayload);
+            if (result)
             {
-                var result = await manageVisitorRepository.UpdateVisitorRequestStatusRepo(updateVisitorRequestPayload);
-                if (result > 0)
+                data.Message = "Visitor updated successfully";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
+            }
+            else
+            {
+                data.Message = "Visitor Not updated";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal("Exception from ManageVisitorService/UpdateVisitors");
+            return await utilities.GetException(ex.Message, "201");
+        }
+
+        return new JsonResult(new
+        {
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
+    }
+    public async Task<IActionResult> GetVisitorById(VisitorById visitorById)
+    {
+        logger.Information("ManageVisitorService/GetVisitorById");
+        MessageData data = new MessageData();
+        try
+        {
+            var result = await manageVisitorRepository.GetVisitorByIdRepo(visitorById);
+            if (result != null)
+            {
+                data.Data = result.FirstOrDefault()!;
+                data.Message = "Data fetched successfully";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
+            }
+            else
+            {
+                data.Message = "No data found";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal("Exception from ManageVisitorService/GetVisitorById");
+            return await utilities.GetException(ex.Message, "201");
+        }
+
+        return new JsonResult(new
+        {
+            data.Data,
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
+    }
+    public async Task<IActionResult> DeleteVisitorById(VisitorById visitorById)
+    {
+        logger.Information("ManageVisitorService/DeleteVisitorById");
+        MessageData data = new MessageData();
+        try
+        {
+            var result = await manageVisitorRepository.DeleteVisitorByIdRepo(visitorById);
+            if (result)
+            {
+                data.Message = "Visitor deleted successfully";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
+            }
+            else
+            {
+                data.Message = "Failed to delete visitor";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal("Exception from ManageVisitorService/DeleteVisitorById");
+            return await utilities.GetException(ex.Message, "201");
+        }
+
+        return new JsonResult(new
+        {
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
+    }
+    public async Task<IActionResult> GetIdProofList()
+    {
+        logger.Information("ManageVisitorService/GetIdProofList");
+        MessageData data = new MessageData();
+        try
+        {
+            var result = await manageVisitorRepository.GetIdProofListRepo();
+            if (result.Any())
+            {
+                data.Data = result;
+                data.Message = "Id Proof document list fethced successfully";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
+            }
+            else
+            {
+                data.Data = null!;
+                data.Message = "Failed to fetch Id Proof document list";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal("Exception from ManageVisitorService/GetIdProofList");
+            return await utilities.GetException(ex.Message, "201");
+        }
+
+        return new JsonResult(new
+        {
+            data.Data,
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
+    }
+    public async Task<IActionResult> GetDepartmentList()
+    {
+        logger.Information("ManageVisitorService/GetDepartmentList");
+        MessageData data = new MessageData();
+        try
+        {
+            var result = await manageVisitorRepository.GetDepartmentListRepo();
+            if (result.Any())
+            {
+                data.Data = result;
+                data.Message = "Department list fethced successfully";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
+            }
+            else
+            {
+                data.Data = null!;
+                data.Message = "Failed to fetch department list";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal("Exception from ManageVisitorService/GetDepartmentList");
+            return await utilities.GetException(ex.Message, "201");
+        }
+
+        return new JsonResult(new
+        {
+            data.Data,
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
+    }
+    public async Task<IActionResult> GetVisitorCount()
+    {
+        logger.Information("ManageVisitorService/GetVisitorCount");
+        MessageData data = new MessageData();
+        try
+        {
+            var result = await manageVisitorRepository.GetVisitorCountRepo();
+            if (result != null)
+            {
+                data.Data = result.FirstOrDefault()!;
+                data.Message = "Visitor count fetched successfully";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
+            }
+            else
+            {
+                data.Data = null!;
+                data.Message = "No visitors available";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal("Exception from ManageVisitorService/GetVisitorCount");
+            return await utilities.GetException(ex.Message, "201");
+        }
+
+        return new JsonResult(new
+        {
+            data.Data,
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
+    }
+
+    public async Task<IActionResult> GetMenuItems(RoleIdPayload roleIdPayload)
+    {
+        logger.Information("ManageVisitorService/GetMenuItems");
+        MessageData data = new MessageData();
+        try
+        {
+            var result = await manageVisitorRepository.GetMenuItemsRepo(roleIdPayload);
+            if (result != null)
+            {
+                data.Data = result;
+                data.Message = "Menu Items fetched successfully";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
+            }
+            else
+            {
+                data.Data = null!;
+                data.Message = "Failed to fetched menu items";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal("Exception from ManageVisitorService/GetMenuItems");
+            return await utilities.GetException(ex.Message, "201");
+        }
+
+        return new JsonResult(new
+        {
+            data.Data,
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
+    }
+
+    public async Task<IActionResult> UpdateVisitorRequestStatus(UpdateVisitorRequestPayload updateVisitorRequestPayload)
+    {
+        logger.Information("ManageVisitorService/UpdateVisitorRequestStatus");
+        MessageData data = new MessageData();
+        try
+        {
+            var result = await manageVisitorRepository.UpdateVisitorRequestStatusRepo(updateVisitorRequestPayload);
+            if (result > 0)
+            {
+                var EmailRequest = new EmailRequest
                 {
-                    var EmailRequest = new EmailRequest
-                    {
-                        ToEmail = updateVisitorRequestPayload.Email,
-                        VisitorPass = updateVisitorRequestPayload.VisitorPass,
-                        Subject = $"Visiting Request is {(updateVisitorRequestPayload.Status == "Approved" ? "Approved" : "Rejected")}",
-                        Body = $@"
+                    ToEmail = updateVisitorRequestPayload.Email,
+                    VisitorPass = updateVisitorRequestPayload.VisitorPass,
+                    Subject = $"Visiting Request is {(updateVisitorRequestPayload.Status == "Approved" ? "Approved" : "Rejected")}",
+                    Body = $@"
                                 <html>
                                   <head>
                                     <style>
@@ -466,63 +453,63 @@ namespace MFL_VisitorManagement.Service
                                       <p>Your visiting request has been 
                                         <b style='color:{(updateVisitorRequestPayload.Status == "Approved" ? "green" : "red")}'>{updateVisitorRequestPayload.Status}</b>.
                                         {(updateVisitorRequestPayload.Status == "Approved"
-                                          ? $"Please use the visitor pass code below upon arrival."
-                                          : "Unfortunately, your access has been denied.")}
+                                      ? $"Please use the visitor pass code below upon arrival."
+                                      : "Unfortunately, your access has been denied.")}
                                       </p>
                                       {(updateVisitorRequestPayload.Status == "Approved"
-                                        ? $"<p class='pass-code'><b>{updateVisitorRequestPayload.VisitorPass}</b></p>"
-                                        : "")}
+                                    ? $"<p class='pass-code'><b>{updateVisitorRequestPayload.VisitorPass}</b></p>"
+                                    : "")}
                                       <p>Thank you.<br/>AWC Software Security Team</p>
                                     </div>
                                   </body>
                                 </html>"
-                    };
+                };
 
-                    var response = await emailService.SendEmailAsync(EmailRequest);
-                    data.Message = "Status updated successfully";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 1;
-                }
-                else
-                {
-                    data.Data = null!;
-                    data.Message = "Failed to update status";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 0;
-                }
+                var response = await emailService.SendEmailAsync(EmailRequest);
+                data.Message = "Status updated successfully";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
             }
-            catch (Exception ex)
+            else
             {
-                logger.Fatal("Exception from ManageVisitorService/UpdateVisitorRequestStatus");
-                return await utilities.GetException(ex.Message, "201");
+                data.Data = null!;
+                data.Message = "Failed to update status";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
             }
-
-            return new JsonResult(new
-            {
-                data.Message,
-                data.StatusCode,
-                data.Token
-            });
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal("Exception from ManageVisitorService/UpdateVisitorRequestStatus");
+            return await utilities.GetException(ex.Message, "201");
         }
 
-        public async Task<IActionResult> CheckIfVisitorExists(VisitorPass_EmailPayload visitorPass_EmailPayload)
+        return new JsonResult(new
         {
-            logger.Information("ManageVisitorService/CheckIfVisitorExists");
-            MessageData data = new MessageData();
-            try
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
+    }
+
+    public async Task<IActionResult> CheckIfVisitorExists(VisitorPass_EmailPayload visitorPass_EmailPayload)
+    {
+        logger.Information("ManageVisitorService/CheckIfVisitorExists");
+        MessageData data = new MessageData();
+        try
+        {
+            var (result, VisitingOfficialEmail, firstName, lastName, VisitingOfficialName, VisitorId) = await manageVisitorRepository.CheckIfVisitorExistsRepo(visitorPass_EmailPayload);
+            if (result > 0)
             {
-                var (result, VisitingOfficialEmail, firstName, lastName, VisitingOfficialName, VisitorId) = await manageVisitorRepository.CheckIfVisitorExistsRepo(visitorPass_EmailPayload);
-                if (result > 0)
+                string approved = "Approved";
+                string rejected = "Rejected";
+                var EmailRequest = new EmailRequest
                 {
-                    string approved = "Approved";
-                    string rejected = "Rejected";
-                    var EmailRequest = new EmailRequest
-                    {
-                        Subject = $"Visitor arrived with visitorPass {visitorPass_EmailPayload.VisitorPass}",
-                        ToEmail = VisitingOfficialEmail,
-                        FirstName = firstName,
-                        LastName = lastName,
-                        Body = $@"
+                    Subject = $"Visitor arrived with visitorPass {visitorPass_EmailPayload.VisitorPass}",
+                    ToEmail = VisitingOfficialEmail,
+                    FirstName = firstName,
+                    LastName = lastName,
+                    Body = $@"
                                 <html>
                                 <head>
                                     <style>
@@ -593,83 +580,82 @@ namespace MFL_VisitorManagement.Service
                                 </body>
                                 </html>"
 
-                    };
-                    await emailService.SendEmailAsync(EmailRequest);  
-                    data.Message = "Visitor Exists Already";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 1;
-                }
-                else
-                {
-                    data.Message = "Visitor does not exists";
-                    data.StatusCode = StatusCodes.Status200OK.ToString();
-                    data.Token = 0;
-                }
+                };
+                await emailService.SendEmailAsync(EmailRequest);  
+                data.Message = "Visitor Exists Already";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
             }
-            catch (Exception ex)
+            else
             {
-                logger.Fatal("Exception from ManageVisitorService/CheckIfVisitorExists");
-                return await utilities.GetException(ex.Message, "201");
+                data.Message = "Visitor does not exists";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
             }
-
-            return new JsonResult(new
-            {
-                data.Message,
-                data.StatusCode,
-                data.Token
-            });
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal("Exception from ManageVisitorService/CheckIfVisitorExists");
+            return await utilities.GetException(ex.Message, "201");
         }
 
-
-
-        //public static void SendEmailWithEmbeddedQRCode(string toEmail, string subject, QrCodeData qrData)
-        //{
-        //    var fromAddress = new MailAddress("squreshi0507@gmail.com", "AWC Software");
-        //    var toAddress = new MailAddress(toEmail);
-        //    const string fromPassword = "lnjz cjmf pqck kogq";
-
-        //    var smtp = new SmtpClient
-        //    {
-        //        Host = "smtp.gmail.com", // e.g., smtp.gmail.com
-        //        Port = 587,
-        //        EnableSsl = true,
-        //        DeliveryMethod = SmtpDeliveryMethod.Network,
-        //        UseDefaultCredentials = false,
-        //        Credentials = new NetworkCredential(fromAddress.Address, fromPassword)
-        //    };
-
-        //    using var qrStream = Utilities.GenerateQRCode(qrData);
-
-        //    var message = new MailMessage(fromAddress, toAddress)
-        //    {
-        //        Subject = subject,
-        //        IsBodyHtml = true
-        //    };
-
-        //    // Set CID (Content-ID) for the image
-        //    string contentId = "qrcode123";
-        //    string htmlBody = $@"
-        //                        <html>
-        //                            <body>
-        //                                <p>Here is your QR Code:</p>
-        //                                <img src='cid:{contentId}' />
-        //                            </body>
-        //                        </html>";
-
-        //    // Create alternate view with linked resource
-        //    var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, null, MediaTypeNames.Text.Html);
-
-        //    var qrImage = new LinkedResource(qrStream, MediaTypeNames.Image.Jpeg)
-        //    {
-        //        ContentId = contentId,
-        //        TransferEncoding = TransferEncoding.Base64,
-        //        ContentType = new ContentType("image/png")
-        //    };
-
-        //    htmlView.LinkedResources.Add(qrImage);
-        //    message.AlternateViews.Add(htmlView);
-
-        //    smtp.Send(message);
-        //}
+        return new JsonResult(new
+        {
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
     }
+
+
+
+    //public static void SendEmailWithEmbeddedQRCode(string toEmail, string subject, QrCodeData qrData)
+    //{
+    //    var fromAddress = new MailAddress("squreshi0507@gmail.com", "AWC Software");
+    //    var toAddress = new MailAddress(toEmail);
+    //    const string fromPassword = "lnjz cjmf pqck kogq";
+
+    //    var smtp = new SmtpClient
+    //    {
+    //        Host = "smtp.gmail.com", // e.g., smtp.gmail.com
+    //        Port = 587,
+    //        EnableSsl = true,
+    //        DeliveryMethod = SmtpDeliveryMethod.Network,
+    //        UseDefaultCredentials = false,
+    //        Credentials = new NetworkCredential(fromAddress.Address, fromPassword)
+    //    };
+
+    //    using var qrStream = Utilities.GenerateQRCode(qrData);
+
+    //    var message = new MailMessage(fromAddress, toAddress)
+    //    {
+    //        Subject = subject,
+    //        IsBodyHtml = true
+    //    };
+
+    //    // Set CID (Content-ID) for the image
+    //    string contentId = "qrcode123";
+    //    string htmlBody = $@"
+    //                        <html>
+    //                            <body>
+    //                                <p>Here is your QR Code:</p>
+    //                                <img src='cid:{contentId}' />
+    //                            </body>
+    //                        </html>";
+
+    //    // Create alternate view with linked resource
+    //    var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, null, MediaTypeNames.Text.Html);
+
+    //    var qrImage = new LinkedResource(qrStream, MediaTypeNames.Image.Jpeg)
+    //    {
+    //        ContentId = contentId,
+    //        TransferEncoding = TransferEncoding.Base64,
+    //        ContentType = new ContentType("image/png")
+    //    };
+
+    //    htmlView.LinkedResources.Add(qrImage);
+    //    message.AlternateViews.Add(htmlView);
+
+    //    smtp.Send(message);
+    //}
 }

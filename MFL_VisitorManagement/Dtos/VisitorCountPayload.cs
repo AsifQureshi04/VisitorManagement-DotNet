@@ -1,7 +1,6 @@
-﻿namespace MFL_VisitorManagement.Dtos
+﻿namespace MFL_VisitorManagement.Dtos;
+
+public class VisitorCountPayload
 {
-    public class VisitorCountPayload
-    {
-        public string fromDate { get; set; }
-    }
+    public string fromDate { get; set; }
 }

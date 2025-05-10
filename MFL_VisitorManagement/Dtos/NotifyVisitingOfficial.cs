@@ -1,8 +1,7 @@
-﻿namespace MFL_VisitorManagement.Dtos
+﻿namespace MFL_VisitorManagement.Dtos;
+
+public class NotifyVisitingOfficial
 {
-    public class NotifyVisitingOfficial
-    {
-        public string VisitorId { get; set; }
-        public string VisitingOfficialEmail { get; set; }
-    }
+    public string VisitorId { get; set; }
+    public string VisitingOfficialEmail { get; set; }
 }

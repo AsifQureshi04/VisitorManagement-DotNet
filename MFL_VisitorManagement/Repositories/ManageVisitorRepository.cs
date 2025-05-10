@@ -6,16 +6,14 @@ using MFL_VisitorManagement.Interface;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Oracle.ManagedDataAccess.Client;
-using System.Collections.Generic;
+using Oracle.ManagedDataAccess.Types;
 using System.Data;
-using System.Net;
-using System.Threading;
 
 namespace MFL_VisitorManagement.Repositories
 {
     public class ManageVisitorRepository(DataContext context) : IManageVisitorRepository
     {
-        public async Task<int> AddVisitorRepo(AddVisitorPaylaod addVisitorPaylaod)
+        public async Task<string> AddVisitorRepo(AddVisitorPaylaod addVisitorPaylaod)
         {
           
             var parameters = new[]
@@ -37,17 +35,22 @@ namespace MFL_VisitorManagement.Repositories
                 new OracleParameter("p_InTime", OracleDbType.TimeStamp)
                 {
                     Value = DateTime.Today.Add(addVisitorPaylaod.InTime.ToTimeSpan())
-                }
+                },
+                new OracleParameter("p_VisitorPass", OracleDbType.Varchar2)
+                {
+                    Direction = ParameterDirection.Output,
+                    Size = 20
+                },
             };
 
-            var res =  await context.Database.ExecuteSqlRawAsync(
+            await context.Database.ExecuteSqlRawAsync(
                 @"BEGIN Sp_AddVisitor(
             :p_FirstName, :p_LastName, :p_Email, :p_PhoneNumber,
             :p_Address, :p_WhomToMeet, :p_Department,
             :p_IdProof, :p_IdProofNumber, :p_ReasonToMeet,
-            :p_VisitDate, :p_InTime); END;", parameters);
+            :p_VisitDate, :p_InTime,:p_VisitorPass); END;", parameters);
 
-            return res;
+            return parameters[12].Value.ToString()!;
         }
         public async Task<PagedList<VisitorDetails>> GetAllVisitorsRepo(GetAllVisitorsPayload getAllVisitorsPayload)
         {
@@ -102,7 +105,8 @@ namespace MFL_VisitorManagement.Repositories
                     Address = reader["Address"]?.ToString()!,
                     WhomToMeet = reader["WhomToMeet"]?.ToString()!,
                     ReasonToMeet = reader["ReasonToMeet"]?.ToString()!,
-                    Department = reader["Department"]?.ToString()!
+                    Department = reader["Department"]?.ToString()!,
+                    Status  = reader["Status"]?.ToString()!
                 });
             }
 
@@ -217,7 +221,7 @@ namespace MFL_VisitorManagement.Repositories
                 parameters);
 
             var result = (Oracle.ManagedDataAccess.Types.OracleDecimal)parameters[1].Value;
-            return result.ToInt32() == 1;
+            return result.ToInt32() > 1;
         }
         public async Task<IEnumerable<IdProofMaster>> GetIdProofListRepo()
         {
@@ -234,11 +238,166 @@ namespace MFL_VisitorManagement.Repositories
 
             return departments!;
         }
-        public Task<IActionResult> GetVisitorCountRepo(VisitorCountPayload visitorCountPayload)
+        public async Task<IEnumerable<VisitorCountDto>> GetVisitorCountRepo()
         {
-            throw new NotImplementedException();
+            var parameters =
+
+                new OracleParameter("o_cursor", OracleDbType.RefCursor)
+                {
+                    Direction = ParameterDirection.Output
+                };
+            
+
+            using var command = context.Database.GetDbConnection().CreateCommand();
+            command.CommandText = "Sp_VisitorCount";
+            command.CommandType = CommandType.StoredProcedure;
+            command.Parameters.Add(parameters);
+
+            await context.Database.OpenConnectionAsync();
+            var reader = await command.ExecuteReaderAsync();
+
+            var result = new List<VisitorCountDto>();
+
+            while(await reader.ReadAsync())
+            {
+                result.Add(new VisitorCountDto
+                {
+                    TodayVisitors = Convert.ToInt32(reader["TodaysVisitor"]),
+                    YesterdayVisitors = Convert.ToInt32(reader["YesterdaysVisitor"]),
+                    LastWeekVisitors = Convert.ToInt32(reader["LastWeekVisitor"]),
+                    TotalVisitors = Convert.ToInt32(reader["TotalVisitor"])
+                });
+            }
+
+            await reader.CloseAsync();
+            await context.Database.CloseConnectionAsync();
+            return result;
         }
-    }   
+
+        public async Task<IEnumerable<MenuItem>> GetMenuItemsRepo(RoleIdPayload roleIdPayload)
+        {
+            var parameters = new[]
+            {
+                new OracleParameter("p_Role", roleIdPayload.RoleName),
+                new OracleParameter("o_cursor", OracleDbType.RefCursor)
+                {
+                    Direction = ParameterDirection.Output
+                }
+            };
+
+            using var command = context.Database.GetDbConnection().CreateCommand();
+            command.CommandText = "Sp_GetMenusWithSubMenus";
+            command.CommandType = CommandType.StoredProcedure;
+            command.Parameters.AddRange(parameters);
+
+            await context.Database.OpenConnectionAsync();
+            var reader = await command.ExecuteReaderAsync();
+
+            var menuDictionary = new Dictionary<int, MenuItem>();
+
+            while (await reader.ReadAsync())
+            {
+                var menuId = Convert.ToInt32(reader["MenuId"]);
+
+                if (!menuDictionary.TryGetValue(menuId, out var menuItem))
+                {
+                    menuItem = new MenuItem
+                    {
+                        MenuId = menuId,
+                        MenuName = reader["MenuName"].ToString()!,
+                        MenuIcon = reader["MenuIcon"].ToString()!,
+                        MenuRoute = reader["MenuRoute"].ToString()!,
+                        SubMenuItem = new List<SubMenuItem>()
+                    };
+
+                    menuDictionary.Add(menuId, menuItem);
+                }
+
+                if (reader["SubMenuId"] != DBNull.Value)
+                {
+                    var subMenu = new SubMenuItem
+                    {
+                        SubMenuId = Convert.ToInt32(reader["SubMenuId"]),
+                        SubMenuName = reader["SubMenuName"].ToString()!,
+                        SubMenuIcon = reader["SubMenuIcon"].ToString()!,
+                        SubMenuRoute = reader["SubMenuRoute"].ToString()!
+                    };
+
+                    menuItem.SubMenuItem.Add(subMenu);
+                }
+            }
+
+            await reader.CloseAsync();
+            await context.Database.CloseConnectionAsync();
+
+            return menuDictionary.Values;
+        }
+
+        public async Task<int> UpdateVisitorRequestStatusRepo(UpdateVisitorRequestPayload updateVisitorRequestPayload)
+        {
+            var parameters = new[]
+            {
+                new OracleParameter("p_Status",updateVisitorRequestPayload.Status),
+                new OracleParameter("p_VisitorId",updateVisitorRequestPayload.VisitorId),
+                new OracleParameter("p_VisitorPass",updateVisitorRequestPayload.VisitorPass),
+                new OracleParameter("p_Result", OracleDbType.Int32)
+                {
+                    Direction = ParameterDirection.Output
+                }
+            };
+
+            await context.Database.ExecuteSqlRawAsync(
+                @"BEGIN Sp_UpdateVisitorRequestStatus(:p_Status,:p_VisitorId,:p_VisitorPass,:p_Result);END;", parameters);
+
+            return Convert.ToInt32(parameters[3].Value.ToString());
+       
+        }
+
+        public async Task<(int Result, string VisitingOfficialEmail, string FirstName, string LastName, string VisitingOfficialName, int VisitorId)> CheckIfVisitorExistsRepo(VisitorPass_EmailPayload visitorPass_EmailPayload)
+        {
+            var parameters = new[]
+            {
+                new OracleParameter("p_Email", visitorPass_EmailPayload.VisitorEmail),
+                new OracleParameter("p_VisitorPass", visitorPass_EmailPayload.VisitorPass),
+                new OracleParameter("p_Result", OracleDbType.Int32)
+                {
+                    Direction = ParameterDirection.Output
+                },
+                new OracleParameter("p_DummyEmail", OracleDbType.Varchar2, 200)
+                {
+                    Direction = ParameterDirection.Output
+                },
+                new OracleParameter("p_FirstName", OracleDbType.Varchar2, 200)
+                {
+                    Direction = ParameterDirection.Output
+                },
+                new OracleParameter("p_LastName", OracleDbType.Varchar2, 200)
+                {
+                    Direction = ParameterDirection.Output
+                },
+                 new OracleParameter("p_VisitingOfficialName", OracleDbType.Varchar2, 200)
+                {
+                    Direction = ParameterDirection.Output
+                },
+                 new OracleParameter("p_VisitorId", OracleDbType.Int32)
+                {
+                    Direction = ParameterDirection.Output
+                }
+            };
+
+            await context.Database.ExecuteSqlRawAsync(
+                @"BEGIN Sp_CheckIfVisitorExists(:p_Email, :p_VisitorPass, :p_Result, :p_DummyEmail, :p_FirstName, :p_LastName, :p_VisitingOfficialName,:p_VisitorId); END;", parameters);
+
+            int result = Convert.ToInt32(((OracleDecimal)parameters[2].Value).Value);
+            string VisitingOfficialEmail = parameters[3].Value?.ToString()!;
+            string firstName = parameters[4].Value?.ToString()!;
+            string lastName = parameters[5].Value?.ToString()!;
+            string VisitingOfficialName = parameters[6].Value?.ToString()!;
+            int VisitorId = Convert.ToInt32(((OracleDecimal)parameters[7].Value).Value);
+
+            return (result, VisitingOfficialEmail,firstName, lastName, VisitingOfficialName, VisitorId);
+        }
+    }
 }
     
    

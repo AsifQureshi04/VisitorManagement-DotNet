@@ -1,4 +1,5 @@
 using MFL_VisitorManagement.Data;
+using MFL_VisitorManagement.EmailNotification;
 using MFL_VisitorManagement.Extensions;
 using MFL_VisitorManagement.Interface;
 using MFL_VisitorManagement.Repositories;
@@ -28,6 +29,8 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddIdentityServices(builder.Configuration);
+//builder.Services.GenerateVisitorRequestQrCode();
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
 
 // Add services to the container.
@@ -36,6 +39,7 @@ builder.Services.AddScoped<IAuthenticateRepository, AuthenticateRepository>();
 builder.Services.AddScoped<IManageVisitorService, ManageVisitorService>();
 builder.Services.AddScoped<IManageVisitorRepository, ManageVisitorRepository>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<Utilities>();
 builder.Services.AddControllersWithViews();
 builder.Services.AddControllers();

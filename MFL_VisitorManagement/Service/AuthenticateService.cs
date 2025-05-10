@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Cryptography;
 using ILogger = Serilog.ILogger;
-
 using System.Text;
 using MFL_VisitorManagement.Utility;
 using MFL_VisitorManagement.Dtos;
@@ -71,7 +70,7 @@ namespace MFL_VisitorManagement.Service
             try
             {
                 var result = await authenticateRepository.UserLoginRepo(UserPayload);
-                if (result.Id != "null")
+                if (result != null)
                 {
                     message.Data = result!;
                     message.StatusCode = StatusCodes.Status200OK.ToString();

@@ -31,7 +31,7 @@ namespace MFL_VisitorManagement.Repositories
                 passwordSalt
             );
 
-            if (passwordSalt.Value == null) return null!;
+            if (passwordSalt.Value.ToString() == "null") return null!;
 
             using (var hmac = new HMACSHA512(Convert.FromBase64String(passwordSalt.Value.ToString()!)))
             {
@@ -50,6 +50,8 @@ namespace MFL_VisitorManagement.Repositories
                                                             new OracleParameter("UserId", userPayload.UserId),
                                                             new OracleParameter("PasswordHash", computedHashString),
                                                             firstName, lastName, email, role, Id);
+
+            if (Id.Value is DBNull) return null!;
 
             var result = new UserLoginResponse
             {

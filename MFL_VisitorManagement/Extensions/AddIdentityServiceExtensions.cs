@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using System.Drawing.Imaging;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using QRCoder;
 
 namespace MFL_VisitorManagement.Extensions
 {
@@ -25,6 +27,23 @@ namespace MFL_VisitorManagement.Extensions
                     };
                 });
             return services;
+        }
+
+        public static string GenerateVisitorRequestQrCode(this IServiceCollection services)
+        {
+            string url = "http://192.168.0.169:4200/VisitorRequest";
+
+            using var qrGenerator = new QRCodeGenerator();
+            using var qrCodeData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
+            using var qrCode = new QRCode(qrCodeData);
+            using var bitmap = qrCode.GetGraphic(20);
+
+            using var ms = new MemoryStream();
+            bitmap.Save(ms, ImageFormat.Png);
+            var base64 = Convert.ToBase64String(ms.ToArray());
+
+            var code =  $"data:image/png;base64,{base64}";
+            return code;
         }
     }
 }

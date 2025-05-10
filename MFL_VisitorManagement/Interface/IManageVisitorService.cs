@@ -13,6 +13,9 @@ namespace MFL_VisitorManagement.Interface
         Task<IActionResult> DeleteVisitorById(VisitorById visitorById);
         Task<IActionResult> GetIdProofList();
         Task<IActionResult> GetDepartmentList();
-        Task<IActionResult> GetVisitorCount(VisitorCountPayload visitorCountPayload);
+        Task<IActionResult> GetVisitorCount();
+        Task<IActionResult> GetMenuItems(RoleIdPayload roleIdPayload);
+        Task<IActionResult> UpdateVisitorRequestStatus(UpdateVisitorRequestPayload updateVisitorRequestPayload);
+        Task<IActionResult> CheckIfVisitorExists(VisitorPass_EmailPayload visitorPass_EmailPayload);
     }
 }

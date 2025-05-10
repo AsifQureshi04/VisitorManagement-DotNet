@@ -8,6 +8,7 @@
         public string ContactNumber { get; set; }
         public int VisitorId { get; set; }
         public string VisitorPass { get; set; }
+        public string Status { get; set; }
         public string VisitDate { get; set; }
         public string InTime { get; set; }
         public string ExitTime { get; set; }

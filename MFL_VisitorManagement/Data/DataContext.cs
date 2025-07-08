@@ -8,6 +8,9 @@ public class DataContext : DbContext
     {
         modelBuilder.Entity<UserAuthentication>()
                 .HasKey(x => x.Id);
+        
+        modelBuilder.Entity<VisitorDetailsDto>()
+                .HasNoKey();
 
         modelBuilder.Entity<UserAuthentication>()
             .Property(x => x.Id)
@@ -51,6 +54,7 @@ public class DataContext : DbContext
     public DbSet<Users> Users { get; set; }
     public DbSet<IdProofMaster> IdProofMasters { get; set; }
     public DbSet<DepartmentMaster>  DepartmentMasters { get; set; }
+    public DbSet<VisitorDetailsDto>  VisitorDetailsDtos { get; set; }
 
 
 

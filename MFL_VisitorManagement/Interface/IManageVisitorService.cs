@@ -13,4 +13,5 @@ public interface IManageVisitorService
     Task<IActionResult> GetMenuItems(RoleIdPayload roleIdPayload);
     Task<IActionResult> UpdateVisitorRequestStatus(UpdateVisitorRequestPayload updateVisitorRequestPayload);
     Task<IActionResult> CheckIfVisitorExists(VisitorPass_EmailPayload visitorPass_EmailPayload);
+    Task<IActionResult> GetVisitorDetailByContact(GetDetailsByMobileDto getDetailsByMobileDto);
 }

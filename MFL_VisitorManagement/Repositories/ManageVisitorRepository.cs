@@ -1,9 +1,10 @@
 ﻿
+
 namespace MFL_VisitorManagement.Repositories;
 
 public class ManageVisitorRepository(DataContext context) : IManageVisitorRepository
 {
-    public async Task<string> AddVisitorRepo(AddVisitorPaylaod addVisitorPaylaod)
+    public async Task<(string VisitorPass,string VisitingOfficialEmail, int VisitorId)> AddVisitorRepo(AddVisitorPaylaod addVisitorPaylaod)
     {
       
         var parameters = new[]
@@ -31,6 +32,15 @@ public class ManageVisitorRepository(DataContext context) : IManageVisitorReposi
                 Direction = ParameterDirection.Output,
                 Size = 20
             },
+            new OracleParameter("p_VisitingOfficialEmail", OracleDbType.Varchar2)
+            {
+                Direction = ParameterDirection.Output,
+                Size = 100
+            },
+            new OracleParameter("p_Visitorid", OracleDbType.Int32)
+            {
+                Direction = ParameterDirection.Output
+            }
         };
 
         await context.Database.ExecuteSqlRawAsync(
@@ -38,9 +48,13 @@ public class ManageVisitorRepository(DataContext context) : IManageVisitorReposi
             :p_FirstName, :p_LastName, :p_Email, :p_PhoneNumber,
             :p_Address, :p_WhomToMeet, :p_Department,
             :p_IdProof, :p_IdProofNumber, :p_ReasonToMeet,
-            :p_VisitDate, :p_InTime,:p_VisitorPass); END;", parameters);
+            :p_VisitDate, :p_InTime,:p_VisitorPass,:p_VisitingOfficialEmail,:p_Visitorid); END;", parameters);
 
-        return parameters[12].Value.ToString()!;
+        string VisitorPass = parameters[12].Value.ToString()!;
+        string VisitingOfficialEmail = parameters[13].Value.ToString()!;
+        int VisitorId = Convert.ToInt32(((OracleDecimal)parameters[14].Value).Value);
+
+        return (VisitorPass, VisitingOfficialEmail, VisitorId);
     }
     public async Task<PagedList<VisitorDetails>> GetAllVisitorsRepo(GetAllVisitorsPayload getAllVisitorsPayload)
     {
@@ -386,6 +400,22 @@ public class ManageVisitorRepository(DataContext context) : IManageVisitorReposi
         int VisitorId = Convert.ToInt32(((OracleDecimal)parameters[7].Value).Value);
 
         return (result, VisitingOfficialEmail,firstName, lastName, VisitingOfficialName, VisitorId);
+    }
+
+    public async Task<IEnumerable<VisitorDetailsDto>> GetVisitorDetailByContactRepo(GetDetailsByMobileDto getDetailsByMobileDto)
+    {
+        var parameters = new[]
+        {
+            new OracleParameter("p_ContactNo",getDetailsByMobileDto.ContactNo),
+            new OracleParameter("o_cursor", OracleDbType.RefCursor)
+            {
+                Direction = ParameterDirection.Output,
+            }
+        };
+
+        return await context.VisitorDetailsDtos.FromSqlRaw(
+            @"BEGIN Sp_GetVisitorDetailByContactNo(:p_ContactNo, :o_cursor);END;", parameters).ToListAsync();
+
     }
 }
 

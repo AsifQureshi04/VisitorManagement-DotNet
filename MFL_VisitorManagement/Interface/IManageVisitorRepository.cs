@@ -2,7 +2,7 @@
 
 public interface IManageVisitorRepository
 {
-    Task<string> AddVisitorRepo(AddVisitorPaylaod addVisitorPaylaod);
+    Task<(string VisitorPass, string VisitingOfficialEmail, int VisitorId)> AddVisitorRepo(AddVisitorPaylaod addVisitorPaylaod);
     Task<PagedList<VisitorDetails>> GetAllVisitorsRepo(GetAllVisitorsPayload getAllVisitorsPayload);
     Task<bool> UpdateVisitorsRepo(UpdateVisitorPayload updateVisitorPayload);
     Task<IEnumerable<VisitorDetails>> GetVisitorByIdRepo(VisitorById visitorById);
@@ -14,6 +14,7 @@ public interface IManageVisitorRepository
     Task<int> UpdateVisitorRequestStatusRepo(UpdateVisitorRequestPayload updateVisitorRequestPayload);
     Task<(int Result, string VisitingOfficialEmail, string FirstName, string LastName,string VisitingOfficialName, int VisitorId)> CheckIfVisitorExistsRepo(VisitorPass_EmailPayload visitorPass_EmailPayload);
     //Task<IEnumerable<MenuItem>> GetVisitorId_VisitingOfficialEmail(RoleIdPayload roleIdPayload);
+    Task<IEnumerable<VisitorDetailsDto>> GetVisitorDetailByContactRepo(GetDetailsByMobileDto getDetailsByMobileDto);
 
 
 }

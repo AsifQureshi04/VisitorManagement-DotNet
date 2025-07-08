@@ -1,4 +1,6 @@
-﻿namespace MFL_VisitorManagement.Entities;
+﻿using System.ComponentModel;
+
+namespace MFL_VisitorManagement.Entities;
 
 public class AddVisitorPaylaod
 {
@@ -16,4 +18,7 @@ public class AddVisitorPaylaod
     public string ReasonToMeet {  get; set; }
     public DateTime VisitDate {  get; set; }
     public TimeOnly InTime {  get; set; }
+    
+    public bool IsInvited { get; set; } 
+
 }

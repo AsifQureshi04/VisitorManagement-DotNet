@@ -94,5 +94,13 @@ public class ManageVisitorsController(ILogger _logger, IManageVisitorService man
         return await manageVisitorService.CheckIfVisitorExists(visitorPass_EmailPayload);
     }
 
+    [AllowAnonymous]
+    [HttpPost("GetVisitorDetailByContact")]
+    public async Task<IActionResult> GetVisitorDetailByContact(GetDetailsByMobileDto getDetailsByMobileDto)
+    {
+        _logger.Information("NotifyVisitorController/CheckIfVisitorExistsByEmail");
+        return await manageVisitorService.GetVisitorDetailByContact(getDetailsByMobileDto);
+    }
+
 
 }

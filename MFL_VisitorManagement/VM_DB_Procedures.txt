@@ -1,0 +1,535 @@
+create or replace PROCEDURE Sp_AddVisitor (
+    p_FirstName       IN VARCHAR2,
+    p_LastName        IN VARCHAR2,
+    p_Email           IN VARCHAR2,
+    p_PhoneNumber     IN VARCHAR2,
+    p_Address         IN VARCHAR2,
+    p_WhomToMeet      IN VARCHAR2,
+    p_Department      IN VARCHAR2,
+    p_IdProof         IN VARCHAR2,
+    p_IdProofNumber   IN VARCHAR2,
+    p_ReasonToMeet    IN VARCHAR2,
+    p_VisitDate       IN DATE,
+    p_InTime          IN TIMESTAMP,
+    p_VisitorPass     OUT VARCHAR2
+) AS
+    v_DepartmentId   NUMBER;
+    v_IdProofId      NUMBER;
+    v_StatusId       NUMBER;
+    v_VisitorId      NUMBER;
+    v_ShortName      VARCHAR2(10);
+    v_VisitorPass    VARCHAR2(15);
+    v_VisitDateParsed DATE;
+BEGIN
+    v_VisitDateParsed := TO_DATE(p_VisitDate, 'DD/MM/YYYY');
+
+    SELECT DepartmentId INTO v_DepartmentId
+    FROM DepartmentMaster
+    WHERE UPPER(DepartmentName) = UPPER(p_Department);
+
+    SELECT IdProofId INTO v_IdProofId
+    FROM IdProofMaster
+    WHERE UPPER(IdProofType) = UPPER(p_IdProof);
+
+    SELECT StatusId INTO v_StatusId
+    FROM StatusMaster
+    WHERE UPPER(StatusName) = UPPER('Pending');
+
+    v_VisitorId := VISITOR_SEQ.NEXTVAL;
+
+    INSERT INTO Visitors (
+        VisitorId, FirstName, LastName, Email, ContactNumber, IdProofNumber,
+        CreatedOn, CreatedBy, ModifiedOn, ModifiedBy,
+        IsActive, IsDelete, IdProofId, Address,
+        WhomToMeet, ReasonToMeet, DepartmentId
+    )
+    VALUES (
+        v_VisitorId, p_FirstName, p_LastName, p_Email, p_PhoneNumber, p_IdProofNumber,
+        SYSDATE, 'Admin', NULL, NULL,
+        1, 0, v_IdProofId, p_Address,
+        p_WhomToMeet, p_ReasonToMeet, v_DepartmentId
+    );
+
+    v_ShortName := SUBSTR(REPLACE(NVL(p_FirstName, '') || NVL(p_LastName, ''), ' ', ''), 1, 10);
+    v_VisitorPass := SUBSTR(v_ShortName || TO_CHAR(v_VisitorId), 1, 15);
+
+  INSERT INTO VisitorPasses (
+        PassId, VisitorId, IssuedBy, StatusId, EntryTime, ExitTime,
+        CreatedOn, CreatedBy, ModifiedOn, ModifiedBy,
+        IsActive, IsDelete, VisitDate, VisitorPass
+    )
+    VALUES (
+        PASS_SEQ.NEXTVAL, v_VisitorId, 'Admin', v_StatusId, p_InTime, NULL,
+        SYSDATE, 'Admin', NULL, NULL,
+        1, 0, v_VisitDateParsed, v_VisitorPass
+    );
+
+    p_VisitorPass := v_VisitorPass;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Department, ID Proof, or Status not found.');
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Error occurred: ' || SQLERRM);
+END;
+
+
+
+
+create or replace PROCEDURE Sp_CheckIfVisitorExists
+(
+    p_Email         IN  VARCHAR2,
+    p_VisitorPass   IN  VARCHAR2,
+    p_Result        OUT NUMBER,
+    p_DummyEmail    OUT VARCHAR2,
+    p_FirstName     OUT VARCHAR2,     
+    p_LastName      OUT VARCHAR2,
+    p_VisitingOfficialName OUT VARCHAR2,
+    p_VisitorId     OUT NUMBER
+
+)
+AS
+BEGIN
+    SELECT vol.Email, v.FirstName, v.LastName, vol.Name, v.VisitorId
+    INTO p_DummyEmail, p_FirstName, p_LastName, p_VisitingOfficialName, p_VisitorId
+    FROM Visitors v
+    JOIN VisitorPasses vp ON v.VisitorId = vp.VisitorId
+    JOIN VisitingOfficialList vol ON vol.Name = v.WhomToMeet
+    WHERE v.Email = p_Email AND vp.VisitorPass = p_VisitorPass;
+
+    p_Result := 1;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        p_Result := 0;
+        p_DummyEmail := NULL;
+    WHEN OTHERS THEN
+        p_Result := -1;
+        p_DummyEmail := NULL;
+END;
+
+
+
+
+
+create or replace PROCEDURE Sp_DeleteVisitor (
+    p_VisitorId IN INT,
+    p_Result    OUT INT
+)
+AS
+    v_Count1 INT := 0;
+    v_Count2 INT := 0;
+BEGIN
+    UPDATE Visitors 
+    SET IsDelete = 1 
+    WHERE VisitorId = p_VisitorId AND IsDelete = '0';
+    v_Count1 := SQL%ROWCOUNT;
+
+    UPDATE VisitorPasses 
+    SET IsDelete = 1 
+    WHERE VisitorId = p_VisitorId AND IsDelete = '0';
+    v_Count2 := SQL%ROWCOUNT;
+
+    p_Result := v_Count1 + v_Count2;
+
+    COMMIT;
+END;
+
+
+
+create or replace PROCEDURE Sp_GetAllVisitors(
+    p_VisitorId    IN INT DEFAULT NULL,
+    p_SearchString IN VARCHAR2,
+    p_fromDate     IN VARCHAR2,
+    p_toDate       IN VARCHAR2,
+    o_cursor       OUT SYS_REFCURSOR
+)
+AS
+    v_fromDate DATE := NULL;
+    v_toDate   DATE := NULL;
+BEGIN
+    BEGIN
+        IF p_fromDate IS NOT NULL THEN
+            BEGIN
+                v_fromDate := TO_DATE(p_fromDate, 'DD-MM-YY');
+            EXCEPTION
+                WHEN OTHERS THEN
+                    v_fromDate := NULL;
+            END;
+        END IF;
+
+        IF p_toDate IS NOT NULL THEN
+            BEGIN
+                v_toDate := TO_DATE(p_toDate, 'DD-MM-YY');
+            EXCEPTION
+                WHEN OTHERS THEN
+                    v_toDate := NULL;
+            END;
+        END IF;
+    END;
+
+    OPEN o_cursor FOR
+        SELECT
+            v.VISITORID AS VisitorId,
+            v.FIRSTNAME AS FirstName,
+            v.LASTNAME AS LastName,
+            v.EMAIL AS EmailId,
+            v.CONTACTNUMBER AS ContactNumber,
+            TO_CHAR(vp.VISITDATE, 'DD-MM-YY') AS VisitDate,
+            vp.VISITORPASS AS VisitorPass,
+            TO_CHAR(vp.ENTRYTIME, 'HH24:MI:SS') AS InTime,
+            TO_CHAR(vp.EXITTIME, 'HH24:MI:SS') AS ExitTime,
+            v.Address AS Address,
+            v.WhomToMeet AS WhomToMeet,
+            v.ReasonToMeet AS ReasonToMeet,
+            d.DepartmentName AS Department,
+            sm.StatusName As Status
+        FROM Visitors v
+        JOIN VisitorPasses vp ON v.VISITORID = vp.VISITORID
+        JOIN DepartmentMaster d ON d.DepartmentId = v.DepartmentId
+        JOIN StatusMaster sm ON sm.StatusId = vp.StatusId
+        WHERE
+            (v.IsActive = '1' AND v.IsDelete = '0' AND vp.IsActive = '1' AND vp.IsDelete = '0')
+            AND (p_VisitorId IS NULL OR v.VISITORID = p_VisitorId)
+            AND (
+                (v_fromDate IS NULL AND v_toDate IS NULL) OR
+                (v_fromDate IS NOT NULL AND v_toDate IS NOT NULL AND vp.VISITDATE BETWEEN v_fromDate AND v_toDate)
+            )
+            AND (
+                (p_SearchString IS NULL OR p_SearchString = '') OR
+                (LOWER(v.FIRSTNAME) LIKE '%' || LOWER(p_SearchString) || '%') OR
+                (LOWER(v.LASTNAME) LIKE '%' || LOWER(p_SearchString) || '%') OR
+                (LOWER(v.EMAIL) LIKE '%' || LOWER(p_SearchString) || '%') OR
+                (v.CONTACTNUMBER LIKE '%' || p_SearchString || '%') OR
+                (TO_CHAR(vp.VISITORPASS) LIKE '%' || p_SearchString || '%')
+            )
+        ORDER BY v.CreatedOn DESC;
+END;
+
+
+
+create or replace PROCEDURE Sp_GetMenusWithSubMenus (
+    p_Role IN VARCHAR2,
+    o_cursor OUT SYS_REFCURSOR
+)
+AS
+BEGIN
+    OPEN o_cursor FOR
+    SELECT 
+        m.MenuId As MenuId,
+        m.MenuName As MenuName,
+        m.Icon As MenuIcon,
+        m.Route As MenuRoute,
+        sm.SubMenuId AS SubMenuId,
+        sm.SubMenuName As SubMenuName,
+        sm.Route AS SubMenuRoute,
+        sm.Icon AS SubMenuIcon
+    FROM
+        RoleMenuMapping rmm 
+        JOIN RoleMaster rm ON rmm.RoleId = rm.RoleId
+        JOIN MenuMaster m ON rmm.MenuId = m.MenuId
+        LEFT JOIN SubMenuMaster sm ON sm.MenuId = m.MenuId AND sm.IsActive = '1' AND sm.IsDelete = '0'
+    WHERE 
+        rm.RoleName = p_Role
+        AND m.IsActive = '1' 
+        AND m.IsDelete = '0'
+    ORDER BY 
+        m.MenuId, sm.SubMenuId;
+END;
+
+
+
+create or replace PROCEDURE Sp_GetPasswordSalt (
+    p_UserId        IN  VARCHAR2,
+    p_PasswordSalt  OUT VARCHAR2
+)
+AS
+    v_Count         NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_Count
+    FROM Users
+    WHERE Email = p_UserId OR UserId = p_UserId;
+
+    IF v_Count > 0 THEN
+        SELECT ua.PasswordSalt
+        INTO p_PasswordSalt
+        FROM Users u
+        JOIN UserAuthentication ua ON ua.UserId = u.UserId
+        WHERE u.Email = p_UserId OR u.UserId = p_UserId
+        AND ROWNUM = 1;
+    ELSE
+        p_PasswordSalt := NULL;
+    END IF;
+END;
+
+
+
+
+
+create or replace PROCEDURE Sp_GetVisitorDetailByContactNo (
+    p_ContactNo   IN  VARCHAR2,
+    o_cursor OUT SYS_REFCURSOR
+
+)
+AS
+BEGIN
+    OPEN o_cursor FOR
+        SELECT v.FirstName, v.LastName, v.Email, v.Address, ipm.idprooftype As IdTpye, v.idproofnumber As IdNumber
+        FROM Visitors v
+        JOIN IdProofMaster ipm ON v.idproofid = ipm.idproofid        
+        WHERE ContactNumber = p_ContactNo
+        AND RowNum = 1;
+    EXCEPTION
+        WHEN OTHERS THEN
+        OPEN o_cursor FOR SELECT NULL AS FirstName, NULL AS LastName, NULL AS Email, NULL AS Address, NULL AS IdTpye, NULL AS IdNumber FROM dual;
+END;
+
+
+
+
+create or replace PROCEDURE Sp_UpdatePassword (
+    p_UserId                IN  VARCHAR2,
+    p_NewPasswordHash       IN  VARCHAR2,
+    p_NewPasswordSalt       IN  VARCHAR2,
+    p_CurrentPasswordHash   IN  VARCHAR2,
+    p_IsUpdated             OUT INTEGER
+)
+AS
+    v_count  INTEGER := 0;
+    v_UserId VARCHAR2(100);
+BEGIN
+    SELECT COUNT(*) INTO v_count
+    FROM UserAuthentication
+    WHERE UPPER(UserId) = UPPER(p_UserId) AND UPPER(PasswordHash) = UPPER(p_CurrentPasswordHash);
+
+    IF v_count > 0 THEN
+        UPDATE UserAuthentication
+        SET PasswordHash = p_NewPasswordHash,
+            PasswordSalt = p_NewPasswordSalt
+        WHERE UPPER(UserId) = UPPER(p_UserId);
+
+        p_IsUpdated := 1;
+        RETURN;
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+    FROM Users
+    WHERE UPPER(Email) = UPPER(p_UserId);
+
+    IF v_count > 0 THEN
+        SELECT UserId INTO v_UserId
+        FROM (
+            SELECT UserId FROM Users WHERE UPPER(Email) = UPPER(p_UserId) AND ROWNUM = 1
+        );
+
+        UPDATE UserAuthentication
+        SET PasswordHash = p_NewPasswordHash,
+            PasswordSalt = p_NewPasswordSalt
+        WHERE UPPER(UserId) = UPPER(v_UserId);
+
+        p_IsUpdated := 1;
+    ELSE
+        p_IsUpdated := 0;
+    END IF;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        p_IsUpdated := -1;
+    WHEN OTHERS THEN
+        p_IsUpdated := -1;
+END;
+
+
+
+
+create or replace PROCEDURE Sp_UpdateVisitor(
+    p_VisitorId   IN NUMBER,
+    p_ExitTime    IN VARCHAR2,
+    p_IsUpdated   OUT NUMBER
+)
+AS
+    v_ExitTimeParsed DATE;
+BEGIN
+    BEGIN
+        IF p_ExitTime IS NOT NULL THEN
+            v_ExitTimeParsed := TO_DATE(p_ExitTime, 'HH24:MI:SS');
+        ELSE
+            p_IsUpdated := 0;
+            RETURN;
+        END IF;
+    EXCEPTION
+        WHEN OTHERS THEN
+            p_IsUpdated := 0;
+            RETURN;
+    END;
+
+    UPDATE VisitorPasses
+    SET EXITTIME = v_ExitTimeParsed
+    WHERE VISITORID = p_VisitorId
+      AND IsActive = '1'
+      AND IsDelete = '0';
+
+    IF SQL%ROWCOUNT > 0 THEN
+        p_IsUpdated := 1;
+    ELSE
+        p_IsUpdated := 0;
+    END IF;
+
+    COMMIT;
+END;
+
+
+
+create or replace PROCEDURE Sp_UpdateVisitorRequestStatus (
+    p_Status       IN  VARCHAR2,
+    p_VisitorId    IN  NUMBER,
+    p_VisitorPass  IN  VARCHAR2,
+    p_Result       OUT NUMBER
+) 
+AS
+    v_StatusId NUMBER;
+BEGIN
+    SELECT StatusId 
+    INTO v_StatusId 
+    FROM StatusMaster
+    WHERE StatusName = p_Status;
+
+    UPDATE VisitorPasses 
+    SET StatusId = v_StatusId 
+    WHERE VisitorId = p_VisitorId 
+      AND VisitorPass = p_VisitorPass;
+
+    p_Result := SQL%ROWCOUNT;
+
+    COMMIT;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Status not found.');
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Unexpected error: ' || SQLERRM);
+END;
+
+
+create or replace PROCEDURE Sp_UserLogin (
+    p_UserId        IN  VARCHAR2,
+    p_PasswordHash  IN  VARCHAR2,
+    p_FirstName     OUT VARCHAR2,
+    p_LastName      OUT VARCHAR2,
+    p_EmailId       OUT VARCHAR2,
+    p_UserRole      OUT VARCHAR2,
+    p_Id            OUT VARCHAR2
+) AS
+    v_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO v_count
+    FROM UserAuthentication
+    WHERE UserId = p_UserId AND PasswordHash = p_PasswordHash;
+
+    IF v_count > 0 THEN
+        SELECT u.FirstName, u.LastName, u.Email, r.RoleName, u.UserId
+        INTO p_FirstName, p_LastName, p_EmailId, p_UserRole, p_Id
+        FROM UserAuthentication ua
+        JOIN Users u ON u.UserId = ua.UserId
+        JOIN RoleMaster r ON r.RoleId = u.RoleId
+        WHERE ua.UserId = p_UserId;
+
+    ELSE
+        SELECT COUNT(*) INTO v_count
+        FROM Users
+        WHERE Email = p_UserId;
+
+        IF v_count > 0 THEN
+            SELECT u.FirstName, u.LastName, u.Email, r.RoleName, u.UserId
+            INTO p_FirstName, p_LastName, p_EmailId, p_UserRole, p_Id
+            FROM UserAuthentication ua
+            JOIN Users u ON u.UserId = ua.UserId
+            JOIN RoleMaster r ON r.RoleId = u.RoleId
+            WHERE u.Email = p_UserId and ua.PasswordHash = p_PasswordHash;
+        ELSE
+            p_FirstName := NULL;
+            p_LastName  := NULL;
+            p_EmailId   := NULL;
+            p_UserRole  := NULL;
+            p_Id        := NULL;
+        END IF;
+    END IF;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        p_FirstName := NULL;
+        p_LastName  := NULL;
+        p_EmailId   := NULL;
+        p_UserRole  := NULL;
+        p_Id        := NULL;
+
+    WHEN OTHERS THEN
+        p_FirstName := NULL;
+        p_LastName  := NULL;
+        p_EmailId   := NULL;
+        p_UserRole  := NULL;
+        p_Id        := NULL;
+END;
+
+
+
+create or replace PROCEDURE SP_USERREGISTRATION (
+    p_FirstName    IN  VARCHAR2,
+    p_LastName     IN  VARCHAR2,
+    p_EmailId      IN  VARCHAR2,
+    p_UserRole     IN  VARCHAR2,
+    p_PasswordHash IN  VARCHAR2,
+    p_PasswordSalt IN  VARCHAR2,
+    p_Result       OUT VARCHAR2
+) AS
+    v_UserId      VARCHAR2(20);
+    v_RoleId      NUMBER;
+    v_InsertedRow NUMBER := 0;
+BEGIN
+    SELECT RoleId INTO v_RoleId
+    FROM RoleMaster
+    WHERE UPPER(RoleName) = UPPER(p_UserRole);
+
+    v_UserId := p_FirstName || DBMS_RANDOM.STRING('X', 6);
+
+    INSERT INTO Users (UserId, FirstName, LastName, Email, RoleId, CreatedOn, CreatedBy, ModifiedOn, ModifiedBy, IsActive, IsDelete)
+    VALUES (v_UserId, p_FirstName, p_LastName, p_EmailId, v_RoleId, SYSDATE, 'Admin', NULL, NULL, '1', '0');
+
+    v_InsertedRow := v_InsertedRow + SQL%ROWCOUNT;
+
+    INSERT INTO UserAuthentication (UserId, PasswordHash, PasswordSalt, CreatedOn, CreatedBy, ModifiedOn, ModifiedBy, IsActive, IsDelete)
+    VALUES (v_UserId, p_PasswordHash, p_PasswordSalt, SYSDATE, 'Admin', NULL, NULL, '1', '0');
+
+    v_InsertedRow := v_InsertedRow + SQL%ROWCOUNT;
+
+    IF v_InsertedRow = 2 THEN
+        p_Result := v_UserId;
+    ELSE
+        p_Result := 'Error: Registration failed';
+    END IF;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        p_Result := 'Error: Role not found';
+    WHEN OTHERS THEN
+        p_Result := 'Error: ' || SQLERRM;
+END SP_USERREGISTRATION;
+
+
+
+
+create or replace PROCEDURE Sp_VisitorCount (
+    o_cursor OUT SYS_REFCURSOR
+)
+AS
+BEGIN
+    OPEN o_cursor FOR
+        SELECT 
+            SUM(CASE WHEN TO_CHAR(vp.VisitDate, 'DD-MM-YY') = TO_CHAR(SYSDATE, 'DD-MM-YY') THEN 1 ELSE 0 END) AS TodaysVisitor,
+            SUM(CASE WHEN TO_CHAR(vp.VisitDate, 'DD-MM-YY') = TO_CHAR(SYSDATE-1, 'DD-MM-YY') THEN 1 ELSE 0 END) AS YesterdaysVisitor,
+            SUM(CASE WHEN TO_CHAR(vp.VisitDate, 'DD-MM-YY') >= TO_CHAR(SYSDATE-7, 'DD-MM-YY') AND
+                          TO_CHAR(vp.VisitDate, 'DD-MM-YY') < TO_CHAR(SYSDATE, 'DD-MM-YY') THEN 1 ELSE 0 END) AS LastWeekVisitor,
+            COUNT(*) AS TotalVisitor
+        FROM Visitors v 
+        JOIN VisitorPasses vp ON v.VisitorId = vp.VisitorId
+        WHERE v.IsActive = '1' AND v.IsDelete = '0' 
+          AND vp.IsActive = '1' AND vp.IsDelete = '0';
+END;

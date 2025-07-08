@@ -1,9 +1,12 @@
-﻿namespace MFL_VisitorManagement.Service;
+﻿using MFL_VisitorManagement.Dtos;
+
+namespace MFL_VisitorManagement.Service;
 
 public class ManageVisitorService(ILogger logger, 
                                   IManageVisitorRepository manageVisitorRepository,
                                   Utilities utilities,
-                                  IEmailService emailService) : IManageVisitorService
+                                  IEmailService emailService,
+                                  MathOperation math) : IManageVisitorService
 {
     public async Task<IActionResult> AddVisitor(AddVisitorPaylaod addVisitorPaylaod)
     {
@@ -11,21 +14,18 @@ public class ManageVisitorService(ILogger logger,
         MessageData data = new MessageData();
         try
         {
-            var result = await manageVisitorRepository.AddVisitorRepo(addVisitorPaylaod);
-            var qrCodeData = addVisitorPaylaod.Adapt<QrCodeData>();
-            using var qrStream = Utilities.GenerateQRCode(qrCodeData);
-            string contentId = "qrcode123";
+            var (VisitingPass , VisitingOfficialEmail, VisitorId) = await manageVisitorRepository.AddVisitorRepo(addVisitorPaylaod);
 
-            if (!result.IsNullOrEmpty())
+            if (!VisitingPass.IsNullOrEmpty() && !VisitingOfficialEmail.IsNullOrEmpty())
             {
-                var EmailRequest = new EmailRequest
+                if (addVisitorPaylaod.IsInvited)
                 {
-                    ToEmail = addVisitorPaylaod.Email,
-                    VisitorPass = result,
-                    Subject = "Visiting Invitation from AWC Software Noida",
-                    QrStream = qrStream,
-                    ContentId = contentId,
-                    Body = $@"
+                    var EmailToVisitor = new EmailRequest
+                    {
+                        ToEmail = addVisitorPaylaod.Email,
+                        VisitorPass = VisitingPass,
+                        Subject = "Visiting Invitation from AWC Software Noida",
+                        Body = $@"  
                                 <!DOCTYPE html>
                                 <html>
                                 <head>
@@ -67,10 +67,8 @@ public class ManageVisitorService(ILogger logger,
                                         <div class='content'>
                                             Hi {addVisitorPaylaod.FirstName} {addVisitorPaylaod.LastName},<br/><br/>
                                             You are invited to visit <strong>AWC Software</strong>.<br/>
-                                            Your visitor pass ID is: <span class='pass'>{result}</span><br/><br/>
+                                            Your visitor pass ID is: <span class='pass'>{VisitingPass}</span><br/><br/>
                                             Please bring a valid ID proof and arrive on time.<br/><br/>
-                                            <strong>Scan this QR Code at entry:</strong><br/><br/>
-                                            <img src='cid:{contentId}' style='width:200px; height=200px' /><br/><br/>
                                             Regards,<br/>
                                             AWC Software Admin Team
                                         </div>
@@ -78,9 +76,206 @@ public class ManageVisitorService(ILogger logger,
                                 </body>
                                 </html>"
 
-                };
+                    };
+                    var EmailToVisitingOfficial = new EmailRequest
+                    {
+                        ToEmail = VisitingOfficialEmail,
+                        VisitorPass = VisitingPass,
+                        Subject = $"Visiting Request with pass Id {VisitingPass}",
+                        Body = $@"  
+                                <!DOCTYPE html>
+                                <html>
+                                <head>
+                                    <meta charset=""utf-8"">
+                                    <title>Visiting Request</title>
+                                    <style>
+                                        body {{
+                                            font-family: Arial, sans-serif;
+                                            background-color: #f4f4f4;
+                                            padding: 20px;
+                                        }}
+                                        .email-container {{
+                                            background-color: #ffffff;
+                                            padding: 20px;
+                                            border-radius: 8px;
+                                            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                                            max-width: 600px;
+                                            margin: auto;
+                                        }}
+                                        .title {{
+                                            font-size: 20px;
+                                            color: #333333;
+                                            margin-bottom: 15px;
+                                        }}
+                                        .content {{
+                                            font-size: 16px;
+                                            color: #555555;
+                                        }}
+                                        .pass {{
+                                            font-size: 18px;
+                                            font-weight: bold;
+                                            color: #007BFF;
+                                        }}
+                                    </style>
+                                </head>
+                                <body>
+                                    <div class='email-container'>
+                                        <div class='title'>Visiting Invitation</div>
+                                        <div class='content'>
+                                            Hi,
+                                            {addVisitorPaylaod.WhomToMeet}
+                                            {addVisitorPaylaod.FirstName} {addVisitorPaylaod.LastName} is invited to meet you
+                                            visitor pass ID is: <span class='pass'>{VisitingPass}</span><br/><br/>
+                                            Regards,<br/>
+                                            AWC Software Admin Team
+                                        </div>
+                                    </div>
+                                </body>
+                            </html>"
 
-                var response = await emailService.SendEmailWithQrCodeAsync(EmailRequest);
+                    };
+                    var response = await emailService.SendEmailAsync(EmailToVisitor);
+                    var res = await emailService.SendEmailAsync(EmailToVisitingOfficial);
+                }
+                else if (!addVisitorPaylaod.IsInvited)
+                {
+                    string approved = "Approved";
+                    string rejected = "Rejected";
+                    var EmailToVisitor = new EmailRequest
+                    {
+                        ToEmail = addVisitorPaylaod.Email,
+                        VisitorPass = VisitingPass,
+                        Subject = $"Visiting Request Confirmation with visiting Id {VisitingPass}",
+                        Body = $@"  
+                                <!DOCTYPE html>
+                                <html>
+                                <head>
+                                    <meta charset=""utf-8"">
+                                    <title>Visiting Request</title>
+                                    <style>
+                                        body {{
+                                            font-family: Arial, sans-serif;
+                                            background-color: #f4f4f4;
+                                            padding: 20px;
+                                        }}
+                                        .email-container {{
+                                            background-color: #ffffff;
+                                            padding: 20px;
+                                            border-radius: 8px;
+                                            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                                            max-width: 600px;
+                                            margin: auto;
+                                        }}
+                                        .title {{
+                                            font-size: 20px;
+                                            color: #333333;
+                                            margin-bottom: 15px;
+                                        }}
+                                        .content {{
+                                            font-size: 16px;
+                                            color: #555555;
+                                        }}
+                                        .pass {{
+                                            font-size: 18px;
+                                            font-weight: bold;
+                                            color: #007BFF;
+                                        }}
+                                    </style>
+                                </head>
+                                <body>
+                                    <div class='email-container'>
+                                        <div class='title'>Visiting Invitation</div>
+                                        <div class='content'>
+                                            Hi {addVisitorPaylaod.FirstName} {addVisitorPaylaod.LastName},<br/><br/>
+                                            Your request has been raised to meet {addVisitorPaylaod.WhomToMeet} at <strong>AWC Software</strong>.<br/>
+                                            Your visitor pass ID is: <span class='pass'>{VisitingPass}</span><br/><br/>
+                                            Regards,<br/>
+                                            AWC Software Admin Team
+                                        </div>
+                                    </div>
+                                </body>
+                                </html>"
+
+                    };
+                    var EmailToVisitingOfficial = new EmailRequest
+                    {
+                        ToEmail = VisitingOfficialEmail,
+                        VisitorPass = VisitingPass,
+                        Subject = $"Visiting Request with pass Id {VisitingPass}",
+                        Body = $@"  
+                                <!DOCTYPE html>
+                                <html>
+                                <head>
+                                    <meta charset=""utf-8"">
+                                    <title>Visiting Request</title>
+                                    <style>
+                                        body {{
+                                            font-family: Arial, sans-serif;
+                                            background-color: #f4f4f4;
+                                            padding: 20px;
+                                        }}
+                                        .email-container {{
+                                            background-color: #ffffff;
+                                            padding: 20px;
+                                            border-radius: 8px;
+                                            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                                            max-width: 600px;
+                                            margin: auto;
+                                        }}
+                                        .title {{
+                                            font-size: 20px;
+                                            color: #333333;
+                                            margin-bottom: 15px;
+                                        }}
+                                        .approve {{
+                                            background-color: #28a745;
+                                        }}
+                                        .reject {{
+                                            background-color: #dc3545;
+                                         }}
+                                        .content {{
+                                            font-size: 16px;
+                                            color: #555555;
+                                        }}
+                                        .footer {{
+                                            margin-top: 30px;
+                                            font-size: 12px;
+                                            color: #aaaaaa;
+                                        }}
+                                        .pass {{
+                                            font-size: 18px;
+                                            font-weight: bold;
+                                            color: #007BFF;
+                                        }}
+                                    </style>
+                                </head>
+                                <body>
+                                    <div class='email-container'>
+                                    <div class='title'>Visiting Invitation</div>
+                                    <div class='content'>
+                                        Dear {addVisitorPaylaod.WhomToMeet},<br><br>
+                                        A visitor, {addVisitorPaylaod.FirstName} {addVisitorPaylaod.LastName}, has arrived at the entry gate and is waiting for your approval to proceed with the meeting.<br><br>
+                                        <strong>Visitor Pass:</strong> {VisitingPass}<br>
+                                        Please click one of the buttons below to approve or reject the meeting request:
+                                    </div>
+
+                                    <a href='http://192.168.0.169:7045/api/NotifyVisitor/UpdateVisitorRequestStatus?visitorPass={VisitingPass}&email={addVisitorPaylaod.Email}&firstName={addVisitorPaylaod.FirstName}&lastName={addVisitorPaylaod.LastName}&status={approved}&visitorId={VisitorId}' class='btn approve'>Approve</a>
+                                    <a href='http://192.168.0.169:7045/api/NotifyVisitor/UpdateVisitorRequestStatus?visitorPass={VisitingPass}&email={addVisitorPaylaod.Email}&firstName={addVisitorPaylaod.FirstName}&lastName={addVisitorPaylaod.LastName}&status={rejected}&visitorId={VisitorId}' class='btn reject'>Reject</a>
+
+                                    <div class='footer'>
+                                        This is an automated message. Please do not reply directly to this email.
+                                    </div>am
+                                        </div>
+                                    </div>
+                                </body>
+                            </html>"
+
+                    };
+                    var response = await emailService.SendEmailAsync(EmailToVisitor);
+                    var res = await emailService.SendEmailAsync(EmailToVisitingOfficial);
+                }
+
+
                 data.Message = "Visitor added successfully";
                 data.StatusCode = StatusCodes.Status200OK.ToString();
                 data.Token = 1;
@@ -109,6 +304,7 @@ public class ManageVisitorService(ILogger logger,
     {
         logger.Information("ManageVisitorService/GetAllVisitors");
         MessageData data = new MessageData();
+        math.a++;
         try
         {
             var result = await manageVisitorRepository.GetAllVisitorsRepo(getAllVisitorsPayload);
@@ -214,7 +410,8 @@ public class ManageVisitorService(ILogger logger,
             data.Data,
             data.Message,
             data.StatusCode,
-            data.Token
+            data.Token,
+            math.a
         });
     }
     public async Task<IActionResult> DeleteVisitorById(VisitorById visitorById)
@@ -329,7 +526,7 @@ public class ManageVisitorService(ILogger logger,
         try
         {
             var result = await manageVisitorRepository.GetVisitorCountRepo();
-            if (result != null)
+            if (result.Any())
             {
                 data.Data = result.FirstOrDefault()!;
                 data.Message = "Visitor count fetched successfully";
@@ -338,7 +535,7 @@ public class ManageVisitorService(ILogger logger,
             }
             else
             {
-                data.Data = null!;
+                data.Data = result.FirstOrDefault()!;
                 data.Message = "No visitors available";
                 data.StatusCode = StatusCodes.Status200OK.ToString();
                 data.Token = 0;
@@ -372,7 +569,7 @@ public class ManageVisitorService(ILogger logger,
                 data.Message = "Menu Items fetched successfully";
                 data.StatusCode = StatusCodes.Status200OK.ToString();
                 data.Token = 1;
-            }
+    }
             else
             {
                 data.Data = null!;
@@ -578,7 +775,7 @@ public class ManageVisitorService(ILogger logger,
                                     </div>
                                     </div>
                                 </body>
-                                </html>"
+                            </html>"
 
                 };
                 await emailService.SendEmailAsync(EmailRequest);  
@@ -601,6 +798,43 @@ public class ManageVisitorService(ILogger logger,
 
         return new JsonResult(new
         {
+            data.Message,
+            data.StatusCode,
+            data.Token
+        });
+    }
+
+    public async Task<IActionResult> GetVisitorDetailByContact(GetDetailsByMobileDto getDetailsByMobileDto)
+    {
+        logger.Information("ManageVisitorService/GetVisitorDetailByContact");
+        MessageData data = new MessageData();
+        try
+        {
+            var result = await manageVisitorRepository.GetVisitorDetailByContactRepo(getDetailsByMobileDto);
+            if (result.Any())
+            {
+                data.Data = result.FirstOrDefault()!;
+                data.Message = "Visitor details fethced.";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 1;
+            }
+            else
+            {
+                data.Data = result;
+                data.Message = "No visitor details found for the provided contact number.";
+                data.StatusCode = StatusCodes.Status200OK.ToString();
+                data.Token = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal("Exception from ManageVisitorService/GetVisitorDetailByContact");
+            return await utilities.GetException(ex.Message, "201");
+        }
+
+        return new JsonResult(new
+        {
+            data.Data,
             data.Message,
             data.StatusCode,
             data.Token

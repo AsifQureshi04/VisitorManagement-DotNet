@@ -8,6 +8,8 @@ builder.Services.AddDbContext<DataContext>(options =>
     options.UseOracle(builder.Configuration.GetConnectionString("OracleDb"));
 });
 
+builder.Services.AddScoped<MFL_VisitorManagement.Service.MathOperation>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAllOrigins",
